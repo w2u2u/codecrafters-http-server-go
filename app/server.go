@@ -44,8 +44,10 @@ func handle_connection(conn net.Conn) {
 		handle_index(conn)
 	case req.method == "GET" && strings.HasPrefix(req.path, "/echo"):
 		handle_echo(conn, req)
+	case req.method == "GET" && strings.HasPrefix(req.path, "/user-agent"):
+		handle_user_agent(conn, req)
 	default:
-		response_not_found(conn)
+		not_found(conn)
 	}
 }
 
@@ -69,9 +71,6 @@ func NewRequest(buffer []byte) (Request, error) {
 		return Request{}, fmt.Errorf("buffer: invalid http header: %v", first_lines)
 	}
 
-	// fmt.Printf("buffer_lines: %v\n", buffer_lines)
-	// fmt.Printf("first_lines: %v\n", first_lines)
-
 	method := first_lines[0]
 	path := first_lines[1]
 	user_agent := strings.Split(buffer_lines[2], " ")[1]
@@ -81,16 +80,20 @@ func NewRequest(buffer []byte) (Request, error) {
 }
 
 func handle_index(conn net.Conn) {
-	response_ok(conn, "", "")
+	ok(conn, "", "")
 }
 
 func handle_echo(conn net.Conn, req Request) {
 	path := strings.TrimLeft(req.path, "/echo/")
 
-	response_ok(conn, "text/plain", path)
+	ok(conn, "text/plain", path)
 }
 
-func response_ok(conn net.Conn, content_type string, content string) {
+func handle_user_agent(conn net.Conn, req Request) {
+	ok(conn, "text/plain", req.user_agent)
+}
+
+func ok(conn net.Conn, content_type string, content string) {
 	if len(content_type) == 0 || len(content) == 0 {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else {
@@ -100,6 +103,6 @@ func response_ok(conn net.Conn, content_type string, content string) {
 	}
 }
 
-func response_not_found(conn net.Conn) {
+func not_found(conn net.Conn) {
 	conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 }
