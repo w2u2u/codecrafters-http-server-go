@@ -82,6 +82,12 @@ func handle_index(conn net.Conn) {
 	response_ok(conn, "", "")
 }
 
+func handle_echo(conn net.Conn, req Request) {
+	path := strings.TrimLeft(req.path, "/echo")
+
+	response_ok(conn, "text/plain", path)
+}
+
 func response_ok(conn net.Conn, content_type string, content string) {
 	if len(content_type) == 0 || len(content) == 0 {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
