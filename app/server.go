@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -78,9 +79,9 @@ type Request struct {
 func NewRequest(conn net.Conn) (Request, error) {
 	buffer := make([]byte, 1024)
 
-	conn.Read(buffer)
+	length, _ := conn.Read(buffer)
 
-	buffer_lines := strings.Split(string(buffer), "\r\n")
+	buffer_lines := strings.Split(string(buffer[:length]), "\r\n")
 
 	if len(buffer_lines) == 0 {
 		return Request{}, fmt.Errorf("buffer: invalid number of lines: %d", len(buffer_lines))
@@ -99,6 +100,10 @@ func NewRequest(conn net.Conn) (Request, error) {
 
 	if len(buffer_lines) > 2 && buffer_lines[2] != "" {
 		user_agent = strings.Split(buffer_lines[2], " ")[1]
+	}
+
+	if buffer_lines[len(buffer_lines)-1] != "" {
+		body = strings.TrimSpace(buffer_lines[len(buffer_lines)-1])
 	}
 
 	return Request{method, path, user_agent, body}, nil
@@ -124,6 +129,7 @@ func handle_read_file(conn net.Conn, req Request, directory string) {
 
 	content, err := os.ReadFile(file_path)
 	if err != nil {
+		log.Println("[ERR]", err)
 		not_found(conn)
 		return
 	}
@@ -131,9 +137,18 @@ func handle_read_file(conn net.Conn, req Request, directory string) {
 	ok(conn, "application/octet-stream", string(content))
 }
 
-func handle_write_file(conn net.Conn, req Request, _ string) {
-	fmt.Println("Req:", req)
-	not_found(conn)
+func handle_write_file(conn net.Conn, req Request, directory string) {
+	file_name := strings.TrimLeft(req.path, "/files")
+	file_path := fmt.Sprintf("%s%s", directory, file_name)
+
+	err := os.WriteFile(file_path, []byte(req.body), 0644)
+	if err != nil {
+		log.Println("[ERR]", err)
+		not_found(conn)
+		return
+	}
+
+	created(conn)
 }
 
 func ok(conn net.Conn, content_type string, content string) {
