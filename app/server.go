@@ -15,29 +15,29 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
+	defer l.Close()
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			continue
+		}
+
+		go handle_connection(conn)
 	}
-
-	handle_connection(conn)
 }
 
 func handle_connection(conn net.Conn) {
 	defer conn.Close()
+	defer fmt.Println("Closing connection")
 
-	buffer := make([]byte, 1024)
-
-	conn.Read(buffer)
-
-	req, err := NewRequest(buffer)
+	req, err := NewRequest(conn)
 	if err != nil {
+		fmt.Println(err)
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
 	}
-
-	fmt.Printf("Request: %+v", req)
 
 	switch true {
 	case req.method == "GET" && req.path == "/":
@@ -58,10 +58,14 @@ type Request struct {
 	body       string
 }
 
-func NewRequest(buffer []byte) (Request, error) {
+func NewRequest(conn net.Conn) (Request, error) {
+	buffer := make([]byte, 1024)
+
+	conn.Read(buffer)
+
 	buffer_lines := strings.Split(string(buffer), "\r\n")
 
-	if len(buffer_lines) < 2 {
+	if len(buffer_lines) == 0 {
 		return Request{}, fmt.Errorf("buffer: invalid number of lines: %d", len(buffer_lines))
 	}
 
@@ -73,8 +77,12 @@ func NewRequest(buffer []byte) (Request, error) {
 
 	method := first_lines[0]
 	path := first_lines[1]
-	user_agent := strings.Split(buffer_lines[2], " ")[1]
+	user_agent := ""
 	body := ""
+
+	if len(buffer_lines) > 2 && buffer_lines[2] != "" {
+		user_agent = strings.Split(buffer_lines[2], " ")[1]
+	}
 
 	return Request{method, path, user_agent, body}, nil
 }
@@ -84,7 +92,7 @@ func handle_index(conn net.Conn) {
 }
 
 func handle_echo(conn net.Conn, req Request) {
-	path := strings.TrimLeft(req.path, "/echo/")
+	path := strings.TrimLeft(req.path, "/echo")
 
 	ok(conn, "text/plain", path)
 }
