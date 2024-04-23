@@ -93,20 +93,20 @@ func NewRequest(conn net.Conn) (Request, error) {
 		return Request{}, fmt.Errorf("buffer: invalid http header: %v", first_lines)
 	}
 
-	method := first_lines[0]
-	path := first_lines[1]
-	user_agent := ""
-	body := ""
+	request := Request{
+		method: first_lines[0],
+		path:   first_lines[1],
+	}
 
 	if len(buffer_lines) > 2 && buffer_lines[2] != "" {
-		user_agent = strings.Split(buffer_lines[2], " ")[1]
+		request.user_agent = strings.Split(buffer_lines[2], " ")[1]
 	}
 
 	if buffer_lines[len(buffer_lines)-1] != "" {
-		body = strings.TrimSpace(buffer_lines[len(buffer_lines)-1])
+		request.body = strings.TrimSpace(buffer_lines[len(buffer_lines)-1])
 	}
 
-	return Request{method, path, user_agent, body}, nil
+	return request, nil
 }
 
 func handle_index(conn net.Conn) {
