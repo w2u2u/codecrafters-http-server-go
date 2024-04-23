@@ -42,6 +42,8 @@ func handle_connection(conn net.Conn) {
 	switch true {
 	case req.method == "GET" && req.path == "/":
 		handle_index(conn)
+	case req.method == "GET" && strings.HasPrefix(req.path, "/echo"):
+		handle_echo(conn, req)
 	default:
 		response_not_found(conn)
 	}
@@ -83,7 +85,7 @@ func handle_index(conn net.Conn) {
 }
 
 func handle_echo(conn net.Conn, req Request) {
-	path := strings.TrimLeft(req.path, "/echo")
+	path := strings.TrimLeft(req.path, "/echo/")
 
 	response_ok(conn, "text/plain", path)
 }
