@@ -8,6 +8,9 @@ import (
 )
 
 func main() {
+	args := os.Args
+	directory := get_arg(args, "--directory")
+
 	fmt.Println("Logs from your program will appear here!")
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
@@ -24,11 +27,21 @@ func main() {
 			continue
 		}
 
-		go handle_connection(conn)
+		go handle_connection(conn, directory)
 	}
 }
 
-func handle_connection(conn net.Conn) {
+func get_arg(args []string, name string) string {
+	for i, arg := range args {
+		if arg == name && len(args) > i {
+			return args[i+1]
+		}
+	}
+
+	return ""
+}
+
+func handle_connection(conn net.Conn, directory string) {
 	defer conn.Close()
 	defer fmt.Println("Closing connection")
 
@@ -46,6 +59,8 @@ func handle_connection(conn net.Conn) {
 		handle_echo(conn, req)
 	case req.method == "GET" && strings.HasPrefix(req.path, "/user-agent"):
 		handle_user_agent(conn, req)
+	case req.method == "GET" && strings.HasPrefix(req.path, "/files"):
+		handle_read_file(conn, req, directory)
 	default:
 		not_found(conn)
 	}
@@ -99,6 +114,19 @@ func handle_echo(conn net.Conn, req Request) {
 
 func handle_user_agent(conn net.Conn, req Request) {
 	ok(conn, "text/plain", req.user_agent)
+}
+
+func handle_read_file(conn net.Conn, req Request, directory string) {
+	file_name := strings.TrimLeft(req.path, "/files")
+	file_path := fmt.Sprintf("%s%s", directory, file_name)
+
+	content, err := os.ReadFile(file_path)
+	if err != nil {
+		not_found(conn)
+		return
+	}
+
+	ok(conn, "application/octet-stream", string(content))
 }
 
 func ok(conn net.Conn, content_type string, content string) {
