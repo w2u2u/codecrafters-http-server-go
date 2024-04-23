@@ -61,6 +61,8 @@ func handle_connection(conn net.Conn, directory string) {
 		handle_user_agent(conn, req)
 	case req.method == "GET" && strings.HasPrefix(req.path, "/files"):
 		handle_read_file(conn, req, directory)
+	case req.method == "POST" && strings.HasPrefix(req.path, "/files"):
+		handle_write_file(conn, req, directory)
 	default:
 		not_found(conn)
 	}
@@ -107,7 +109,7 @@ func handle_index(conn net.Conn) {
 }
 
 func handle_echo(conn net.Conn, req Request) {
-	path := strings.TrimLeft(req.path, "/echo")
+	path := strings.TrimLeft(req.path, "/echo/")
 
 	ok(conn, "text/plain", path)
 }
@@ -129,6 +131,11 @@ func handle_read_file(conn net.Conn, req Request, directory string) {
 	ok(conn, "application/octet-stream", string(content))
 }
 
+func handle_write_file(conn net.Conn, req Request, _ string) {
+	fmt.Println("Req:", req)
+	not_found(conn)
+}
+
 func ok(conn net.Conn, content_type string, content string) {
 	if len(content_type) == 0 || len(content) == 0 {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
@@ -137,6 +144,10 @@ func ok(conn net.Conn, content_type string, content string) {
 
 		conn.Write([]byte(response))
 	}
+}
+
+func created(conn net.Conn) {
+	conn.Write([]byte("HTTP/1.1 201 CREATED\r\n\r\n"))
 }
 
 func not_found(conn net.Conn) {
