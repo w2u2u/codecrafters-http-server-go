@@ -70,10 +70,11 @@ func handle_connection(conn net.Conn, directory string) {
 }
 
 type Request struct {
-	method     string
-	path       string
-	user_agent string
-	body       string
+	method          string
+	path            string
+	user_agent      string
+	body            string
+	accept_encoding string
 }
 
 func NewRequest(conn net.Conn) (Request, error) {
@@ -98,8 +99,16 @@ func NewRequest(conn net.Conn) (Request, error) {
 		path:   first_lines[1],
 	}
 
-	if len(buffer_lines) > 2 && buffer_lines[2] != "" {
-		request.user_agent = strings.Split(buffer_lines[2], " ")[1]
+	for _, line := range buffer_lines {
+		switch true {
+		case strings.HasPrefix(line, "User-Agent"):
+			request.user_agent = strings.Split(line, " ")[1]
+		case strings.HasPrefix(line, "Accept-Encoding"):
+			accept_encoding := strings.Split(line, " ")[1]
+			if accept_encoding == "gzip" {
+				request.accept_encoding = strings.Split(line, " ")[1]
+			}
+		}
 	}
 
 	if buffer_lines[len(buffer_lines)-1] != "" {
@@ -110,17 +119,17 @@ func NewRequest(conn net.Conn) (Request, error) {
 }
 
 func handle_index(conn net.Conn) {
-	ok(conn, "", "")
+	ok(conn, "", "", "")
 }
 
 func handle_echo(conn net.Conn, req Request) {
 	path := strings.TrimLeft(req.path, "/echo/")
 
-	ok(conn, "text/plain", path)
+	ok(conn, "text/plain", req.accept_encoding, path)
 }
 
 func handle_user_agent(conn net.Conn, req Request) {
-	ok(conn, "text/plain", req.user_agent)
+	ok(conn, "text/plain", req.accept_encoding, req.user_agent)
 }
 
 func handle_read_file(conn net.Conn, req Request, directory string) {
@@ -134,7 +143,7 @@ func handle_read_file(conn net.Conn, req Request, directory string) {
 		return
 	}
 
-	ok(conn, "application/octet-stream", string(content))
+	ok(conn, "application/octet-stream", req.accept_encoding, string(content))
 }
 
 func handle_write_file(conn net.Conn, req Request, directory string) {
@@ -151,18 +160,26 @@ func handle_write_file(conn net.Conn, req Request, directory string) {
 	created(conn)
 }
 
-func ok(conn net.Conn, content_type string, content string) {
+func ok(conn net.Conn, content_type string, accept_encoding string, content string) {
 	if len(content_type) == 0 || len(content) == 0 {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else {
-		response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", content_type, len(content), content)
+		response := "HTTP/1.1 200 OK"
+		response = fmt.Sprintf("%s\r\nContent-Type: %s", response, content_type)
+		response = fmt.Sprintf("%s\r\nContent-Length: %d", response, len(content))
+
+		if len(accept_encoding) > 0 {
+			response = fmt.Sprintf("%s\r\nContent-Encoding: %s", response, accept_encoding)
+		}
+
+		response = fmt.Sprintf("%s\r\n\r\n%s", response, content)
 
 		conn.Write([]byte(response))
 	}
 }
 
 func created(conn net.Conn) {
-	conn.Write([]byte("HTTP/1.1 201 CREATED\r\n\r\n"))
+	conn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 }
 
 func not_found(conn net.Conn) {
