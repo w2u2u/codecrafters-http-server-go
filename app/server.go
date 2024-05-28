@@ -123,9 +123,9 @@ func handle_index(conn net.Conn) {
 }
 
 func handle_echo(conn net.Conn, req Request) {
-	path := strings.TrimLeft(req.path, "/echo/")
+	paths := strings.Split(req.path, "/")
 
-	ok(conn, "text/plain", req.accept_encoding, path)
+	ok(conn, "text/plain", req.accept_encoding, paths[2])
 }
 
 func handle_user_agent(conn net.Conn, req Request) {
