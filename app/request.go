@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 )
 
@@ -41,10 +42,14 @@ func NewRequest(conn net.Conn) (Request, error) {
 		case strings.HasPrefix(line, "User-Agent"):
 			request.userAgent = strings.Split(line, " ")[1]
 		case strings.HasPrefix(line, "Accept-Encoding"):
-			accept_encoding := strings.Split(line, " ")[1]
-			if accept_encoding == "gzip" {
-				request.acceptEncoding = strings.Split(line, " ")[1]
+			accept_encoding := strings.SplitN(line, " ", 2)[1]
+			encodings := strings.Split(accept_encoding, ", ")
+
+			if slices.Contains(encodings, "gzip") {
+				request.acceptEncoding = "gzip"
 			}
+
+			fmt.Println("request", request)
 		}
 	}
 
